@@ -1,0 +1,63 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temperature-exporter
+  labels:
+    app: temperature-exporter
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: temperature-exporter
+  template:
+    metadata:
+      labels:
+        app: temperature-exporter
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: remote-desktop
+      containers:
+        - name: temperature-exporter
+          image: cajaks2/temperature-exporter:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9012
+              hostPort: 9012
+              protocol: TCP
+          volumeMounts:
+            - name: digitemp-config
+              mountPath: /etc/digitemp.conf
+              subPath: digitemp.conf
+            - name: serial-device
+              mountPath: /dev/ttyUSB0
+          securityContext:
+            privileged: true
+          resources:
+            limits:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 9012
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9012
+            initialDelaySeconds: 5
+            periodSeconds: 15
+            failureThreshold: 3
+
+      volumes:
+        - name: digitemp-config
+          configMap:
+            name: digitemp-config
+        - name: serial-device
+          hostPath:
+            path: /dev/ttyUSB0
+            type: CharDevice
